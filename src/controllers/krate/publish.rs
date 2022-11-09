@@ -77,6 +77,7 @@ pub fn publish(req: &mut dyn RequestExt) -> EndpointResult {
         ))
     })?;
 
+    println!("!!!!! OK");
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated crate.
     conn.transaction(|| {

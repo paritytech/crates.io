@@ -51,6 +51,7 @@ impl ApiToken {
         let token_ = SecureToken::parse(SecureTokenKind::Api, token_)
             .ok_or_else(InsecurelyGeneratedTokenRevoked::boxed)?;
 
+        println!("!!!! {:?}", token);
         let tokens = api_tokens
             .filter(revoked.eq(false))
             .filter(token.eq(&token_));

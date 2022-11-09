@@ -68,15 +68,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ))
             .execute(&conn).unwrap();
 
-        let api_token = env::var("API_TOKEN").unwrap();
-        let api_token_bytes = api_token.as_bytes().into_sql::<diesel::sql_types::Binary>();
-        diesel::insert_into(api_tokens::table)
-            .values((
-                api_tokens::user_id.eq(user.id),
-                api_tokens::name.eq("foo"),
-                api_tokens::token.eq(api_token_bytes),
-            ))
-            .execute(&conn).unwrap();
+        let api_token_prefix = env::var("API_TOKEN_PREFIX").unwrap();
+        use cargo_registry::models::ApiToken;
+        let token = ApiToken::insert(&conn, user.id, "foo").unwrap();
+        eprintln!("{}={}", api_token_prefix, token.plaintext);
+
+        // let api_token = env::var("API_TOKEN").unwrap();
+        // let api_token_bytes = api_token.as_bytes().into_sql::<diesel::sql_types::Binary>();
+        // diesel::insert_into(api_tokens::table)
+        //     .values((
+        //         api_tokens::user_id.eq(user.id),
+        //         api_tokens::name.eq("foo"),
+        //         api_tokens::token.eq(api_token_bytes),
+        //         api_tokens::revoked.eq(false),
+        //     ))
+        //     .execute(&conn).unwrap();
     }
 
     // Start the background thread periodically persisting download counts to the database.
