@@ -37,6 +37,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
     let app = Arc::new(App::new(config, Some(client)));
 
+    {
+        use cargo_registry::models::NewUser;
+        use cargo_registry::schema::api_tokens;
+        use diesel::prelude::*;
+        use cargo_registry::db::oneoff_connection_with_config;
+        let conn = oneoff_connection_with_config(&app.config.db).unwrap();
+        let user = NewUser {
+                gh_id: 1,
+                gh_login: "login",
+                name: None,
+                gh_avatar: None,
+                gh_access_token: "access_token".into()
+            }
+            .create_or_update(None, &app.emails, &conn)
+            .unwrap();
+        let api_token = env::var("API_TOKEN").unwrap();
+        let api_token_bytes = api_token.as_bytes().into_sql::<diesel::sql_types::Binary>();
+        diesel::insert_into(api_tokens::table)
+            .values((
+                api_tokens::user_id.eq(user.id),
+                api_tokens::name.eq("foo"),
+                api_tokens::token.eq(api_token_bytes),
+            ))
+            .execute(&conn).unwrap();
+    }
+
     // Start the background thread periodically persisting download counts to the database.
     downloads_counter_thread(app.clone());
 
