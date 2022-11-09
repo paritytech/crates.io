@@ -39,10 +39,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         use cargo_registry::models::NewUser;
-        use cargo_registry::schema::api_tokens;
+        use cargo_registry::schema::{api_tokens, emails, users};
         use diesel::prelude::*;
         use cargo_registry::db::oneoff_connection_with_config;
+
         let conn = oneoff_connection_with_config(&app.config.db).unwrap();
+
+        diesel::delete(users::table).execute(&conn).unwrap();
         let user = NewUser {
                 gh_id: 1,
                 gh_login: "login",
@@ -52,6 +55,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             .create_or_update(None, &app.emails, &conn)
             .unwrap();
+
+        diesel::delete(emails::table).execute(&conn).unwrap();
+        diesel::
+            insert_into(emails::table)
+            .values((
+                emails::user_id.eq(user.id),
+                emails::email.eq("foo@bar.com"),
+                emails::verified.eq(true)
+            ))
+            .execute(&conn).unwrap();
+
+        diesel::delete(api_tokens::table).execute(&conn).unwrap();
         let api_token = env::var("API_TOKEN").unwrap();
         let api_token_bytes = api_token.as_bytes().into_sql::<diesel::sql_types::Binary>();
         diesel::insert_into(api_tokens::table)
