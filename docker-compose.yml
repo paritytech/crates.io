@@ -1,4 +1,4 @@
-version: "3.4"
+version: "3.9"
 
 x-backend: &backend
   build:
@@ -7,14 +7,13 @@ x-backend: &backend
     network: host
   environment:
     DEV_DOCKER: "true"
-    DATABASE_URL: postgres://postgres:password@postgres/cargo_registry
+    DATABASE_URL: postgres://postgres:password@localhost:5432/cargo_registry
     SESSION_KEY: badkeyabcdefghijklmnopqrstuvwxyzabcdef
     GIT_REPO_URL: file:///app/tmp/index-bare
     GH_CLIENT_ID: ""
     GH_CLIENT_SECRET: ""
     WEB_ALLOWED_ORIGINS: http://localhost:8888,http://localhost:4200
-  links:
-    - postgres
+  network_mode: "host"
   volumes:
     # Mount the src/ directory so we don't have to rebuild the Docker image
     # when we want to change some code
@@ -36,33 +35,25 @@ services:
     volumes:
       - ./docker/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 8
 
   backend:
     <<: *backend
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - 8888:8888
-    depends_on:
-      - postgres
 
   worker:
     <<: *backend
     entrypoint: cargo run --bin background-worker
     depends_on:
       - backend
-
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend.Dockerfile
-      network: host
-    entrypoint: pnpm start -- --proxy http://backend:8888
-    links:
-      - backend
-    ports:
-      - 4200:4200
-    volumes:
-      # Mount the app/ directory so live reload works
-      - ./app:/app/app:ro
 
 volumes:
   postgres-data:
