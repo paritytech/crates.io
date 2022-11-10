@@ -38,51 +38,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Arc::new(App::new(config, Some(client)));
 
     {
-        use cargo_registry::models::NewUser;
-        use cargo_registry::schema::{api_tokens, emails, users};
-        use diesel::prelude::*;
-        use cargo_registry::db::oneoff_connection_with_config;
+        if env::var("SKIP_INIT").is_err() {
+            use cargo_registry::models::NewUser;
+            use cargo_registry::schema::{api_tokens, emails, users};
+            use diesel::prelude::*;
+            use cargo_registry::db::oneoff_connection_with_config;
 
-        let conn = oneoff_connection_with_config(&app.config.db).unwrap();
+            let conn = oneoff_connection_with_config(&app.config.db).unwrap();
 
-        diesel::delete(api_tokens::table).execute(&conn).unwrap();
-        diesel::delete(emails::table).execute(&conn).unwrap();
-        diesel::delete(users::table).execute(&conn).unwrap();
+            diesel::delete(api_tokens::table).execute(&conn).unwrap();
+            diesel::delete(emails::table).execute(&conn).unwrap();
+            diesel::delete(users::table).execute(&conn).unwrap();
 
-        let user = NewUser {
-                gh_id: 1,
-                gh_login: "login",
-                name: None,
-                gh_avatar: None,
-                gh_access_token: "access_token".into()
-            }
-            .create_or_update(None, &app.emails, &conn)
-            .unwrap();
+            let user = NewUser {
+                    gh_id: 1,
+                    gh_login: "login",
+                    name: None,
+                    gh_avatar: None,
+                    gh_access_token: "access_token".into()
+                }
+                .create_or_update(None, &app.emails, &conn)
+                .unwrap();
 
-        diesel::
-            insert_into(emails::table)
-            .values((
-                emails::user_id.eq(user.id),
-                emails::email.eq("foo@bar.com"),
-                emails::verified.eq(true)
-            ))
-            .execute(&conn).unwrap();
+            diesel::
+                insert_into(emails::table)
+                .values((
+                    emails::user_id.eq(user.id),
+                    emails::email.eq("foo@bar.com"),
+                    emails::verified.eq(true)
+                ))
+                .execute(&conn).unwrap();
 
-        let api_token_prefix = env::var("API_TOKEN_PREFIX").unwrap();
-        use cargo_registry::models::ApiToken;
-        let token = ApiToken::insert(&conn, user.id, "foo").unwrap();
-        eprintln!("{}={}", api_token_prefix, token.plaintext);
-
-        // let api_token = env::var("API_TOKEN").unwrap();
-        // let api_token_bytes = api_token.as_bytes().into_sql::<diesel::sql_types::Binary>();
-        // diesel::insert_into(api_tokens::table)
-        //     .values((
-        //         api_tokens::user_id.eq(user.id),
-        //         api_tokens::name.eq("foo"),
-        //         api_tokens::token.eq(api_token_bytes),
-        //         api_tokens::revoked.eq(false),
-        //     ))
-        //     .execute(&conn).unwrap();
+            let api_token_prefix = env::var("API_TOKEN_PREFIX").unwrap();
+            use cargo_registry::models::ApiToken;
+            let token = ApiToken::insert(&conn, user.id, "foo").unwrap();
+            eprintln!("{}={}", api_token_prefix, token.plaintext);
+        }
     }
 
     // Start the background thread periodically persisting download counts to the database.

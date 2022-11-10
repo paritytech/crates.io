@@ -343,12 +343,6 @@ pub fn add_dependencies(
     let git_and_new_dependencies = deps
         .iter()
         .map(|dep| {
-            if let Some(registry) = &dep.registry {
-                if !registry.is_empty() {
-                    return Err(cargo_err(&format_args!("Dependency `{}` is hosted on another registry. Cross-registry dependencies are not permitted on crates.io.", &*dep.name)));
-                }
-            }
-
             // Match only identical names to ensure the index always references the original crate name
             let krate:Crate = Crate::by_exact_name(&dep.name)
                 .first(conn)
