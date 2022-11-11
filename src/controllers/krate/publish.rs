@@ -345,6 +345,8 @@ pub fn add_dependencies(
         .map(|dep| {
             // Match only identical names to ensure the index always references the original crate name
             let crate_for_foreign_dep = || -> AppResult<Crate> {
+                use crate::models::User;
+                let user = users::table.first::<User>(conn)?;
                 let foreign_crate_description = "Foreign crate for self-hosted instance";
                 if let Ok(krate) = Crate::by_exact_name(&dep.name).first::<Crate>(conn) {
                     if krate
@@ -369,7 +371,7 @@ pub fn add_dependencies(
                         description: Some(foreign_crate_description),
                         ..NewCrate::default()
                     }
-                    .create_or_update(conn, 1, None)
+                    .create_or_update(conn, user.id, None)
                     .map_err(|err| {
                         cargo_err(&format_args!(
                             "Unable to mock crate `{}`: {:?}",
