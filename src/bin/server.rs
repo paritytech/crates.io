@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let api_token_prefix = env::var("API_TOKEN_PREFIX").unwrap();
             use cargo_registry::models::ApiToken;
             let token = ApiToken::insert(&conn, user.id, "foo").unwrap();
-            eprintln!("{}={}", api_token_prefix, token.plaintext);
+            println!("{}={}", api_token_prefix, token.plaintext);
         }
     }
 

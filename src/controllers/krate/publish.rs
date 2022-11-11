@@ -344,15 +344,47 @@ pub fn add_dependencies(
         .iter()
         .map(|dep| {
             // Match only identical names to ensure the index always references the original crate name
-            let krate:Crate = Crate::by_exact_name(&dep.name)
-                .first(conn)
-                .map_err(|_| cargo_err(&format_args!("no known crate named `{}`", &*dep.name)))?;
-
-            if let Ok(version_req) = semver::VersionReq::parse(&dep.version_req.0) {
-                if version_req == semver::VersionReq::STAR {
-                    return Err(cargo_err(WILDCARD_ERROR_MESSAGE));
+            let crate_id_for_foreign_dep = || -> AppResult<i32> {
+                if Crate::by_exact_name(&dep.name).first::<Crate>(conn).is_ok() {
+                    return Err(cargo_err(&format_args!(
+                        "crate named `{}` already exists",
+                        &*dep.name
+                    )));
                 }
-            }
+                let krate = NewCrate {
+                    name: &*dep.name,
+                    homepage: Some("https://foo.bar"),
+                    documentation: Some("https://foo.bar"),
+                    repository: Some("https://foo.bar"),
+                    ..NewCrate::default()
+                }
+                .create_or_update(conn, 1, None)
+                .map_err(|err| {
+                    cargo_err(&format_args!(
+                        "Unable to mock crate `{}`: {:?}",
+                        &*dep.name, err
+                    ))
+                })?;
+                Ok(krate.id)
+            };
+            let krate_id = if let Some(registry) = dep.registry.as_ref() {
+                if registry.is_empty() {
+                    let krate: Crate =
+                        Crate::by_exact_name(&dep.name).first(conn).map_err(|_| {
+                            cargo_err(&format_args!("no known crate named `{}`", &*dep.name))
+                        })?;
+                    if let Ok(version_req) = semver::VersionReq::parse(&dep.version_req.0) {
+                        if version_req == semver::VersionReq::STAR {
+                            return Err(cargo_err(WILDCARD_ERROR_MESSAGE));
+                        }
+                    }
+                    krate.id
+                } else {
+                    crate_id_for_foreign_dep()?
+                }
+            } else {
+                crate_id_for_foreign_dep()?
+            };
 
             // If this dependency has an explicit name in `Cargo.toml` that
             // means that the `name` we have listed is actually the package name
@@ -372,19 +404,22 @@ pub fn add_dependencies(
                     optional: dep.optional,
                     default_features: dep.default_features,
                     target: dep.target.clone(),
-                    kind: dep.kind.or(Some(DependencyKind::Normal)).map(|dk| dk.into()),
+                    kind: dep
+                        .kind
+                        .or(Some(DependencyKind::Normal))
+                        .map(|dk| dk.into()),
                     package,
                 },
                 (
                     version_id.eq(target_version_id),
-                    crate_id.eq(krate.id),
+                    crate_id.eq(krate_id),
                     req.eq(dep.version_req.to_string()),
                     dep.kind.map(|k| kind.eq(k as i32)),
                     optional.eq(dep.optional),
                     default_features.eq(dep.default_features),
                     features.eq(&dep.features),
                     target.eq(dep.target.as_deref()),
-                    explicit_name.eq(dep.explicit_name_in_toml.as_deref())
+                    explicit_name.eq(dep.explicit_name_in_toml.as_deref()),
                 ),
             ))
         })
