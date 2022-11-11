@@ -344,6 +344,9 @@ pub fn add_dependencies(
         .iter()
         .map(|dep| {
             // Match only identical names to ensure the index always references the original crate name
+
+            // Official crates.io implementation doesn't support alternate registries
+            // https://github.com/rust-lang/crates.io/pull/1589
             let crate_for_foreign_dep = || -> AppResult<Crate> {
                 use crate::models::User;
                 let user = users::table.first::<User>(conn)?;
