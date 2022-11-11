@@ -347,9 +347,15 @@ pub fn add_dependencies(
 
             // Official crates.io implementation doesn't support alternate registries
             // https://github.com/rust-lang/crates.io/pull/1589
-            let crate_for_foreign_dep = || -> AppResult<Crate> {
-                use crate::models::User;
-                let user = users::table.first::<User>(conn)?;
+            let krate = if
+            /* crates.io and foreign registries */
+            dep
+                .registry
+                .as_ref()
+                .map(|reg| !(reg.is_empty() || reg == "local"))
+                .unwrap_or(false)
+            {
+                let user = users::table.first::<crate::models::User>(conn)?;
                 let foreign_crate_description = "Foreign crate for self-hosted instance";
                 if let Ok(krate) = Crate::by_exact_name(&dep.name).first::<Crate>(conn) {
                     if krate
@@ -358,12 +364,12 @@ pub fn add_dependencies(
                         .map(|description| description == foreign_crate_description)
                         .unwrap_or(false)
                     {
-                        Ok(krate)
+                        krate
                     } else {
-                        Err(cargo_err(&format_args!(
+                        return Err(cargo_err(&format_args!(
                             "crate named `{}` is not a foreign dependency",
                             &*dep.name
-                        )))
+                        )));
                     }
                 } else {
                     let krate = NewCrate {
@@ -381,21 +387,12 @@ pub fn add_dependencies(
                             &*dep.name, err
                         ))
                     })?;
-                    Ok(krate)
-                }
-            };
-            let krate = if let Some(registry) = dep.registry.as_ref() {
-                if registry.is_empty() {
-                    let krate: Crate =
-                        Crate::by_exact_name(&dep.name).first(conn).map_err(|_| {
-                            cargo_err(&format_args!("no known crate named `{}`", &*dep.name))
-                        })?;
                     krate
-                } else {
-                    crate_for_foreign_dep()?
                 }
             } else {
-                crate_for_foreign_dep()?
+                Crate::by_exact_name(&dep.name).first(conn).map_err(|_| {
+                    cargo_err(&format_args!("no known crate named `{}`", &*dep.name))
+                })?
             };
 
             if let Ok(version_req) = semver::VersionReq::parse(&dep.version_req.0) {
