@@ -103,11 +103,19 @@ pub fn download(req: &mut dyn RequestExt) -> EndpointResult {
         }
     };
 
-    let redirect_url = req
+    let redirect_path = req
         .app()
         .config
         .uploader()
         .crate_location(&crate_name, version);
+
+    let conn = req.db_read_prefer_primary()?;
+    let redirect_url = match Crate::by_name(&crate_name).first::<Crate>(&*conn) {
+        Ok(_) => redirect_path,
+        Err(_) => {
+            format!("https://crates.io/api/v1{redirect_path}")
+        }
+    };
 
     if req.wants_json() {
         Ok(req.json(&json!({ "url": redirect_url })))

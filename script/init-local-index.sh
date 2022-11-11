@@ -34,6 +34,7 @@ git add .
 git commit -qm 'Initial commit'
 git remote add origin file://"$project_root"/tmp/index-bare
 git push -q origin master -u > /dev/null
+
 cd "$project_root"
 
 # Remove the temporary checkout
