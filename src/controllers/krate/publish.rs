@@ -345,17 +345,18 @@ pub fn add_dependencies(
         .map(|dep| {
             // Match only identical names to ensure the index always references the original crate name
             let crate_for_foreign_dep = || -> AppResult<Crate> {
+                let foreign_crate_description = "Foreign crate for self-hosted instance";
                 if let Ok(krate) = Crate::by_exact_name(&dep.name).first::<Crate>(conn) {
                     if krate
                         .description
                         .as_ref()
-                        .map(|description| description == "Foreign crate for self-hosted instance")
+                        .map(|description| description == foreign_crate_description)
                         .unwrap_or(false)
                     {
                         Ok(krate)
                     } else {
                         Err(cargo_err(&format_args!(
-                            "crate named `{}` already exists",
+                            "crate named `{}` is not a foreign dependency",
                             &*dep.name
                         )))
                     }
@@ -365,7 +366,7 @@ pub fn add_dependencies(
                         homepage: Some("https://foo.bar"),
                         documentation: Some("https://foo.bar"),
                         repository: Some("https://foo.bar"),
-                        description: Some("Foreign crate for self-hosted instance"),
+                        description: Some(foreign_crate_description),
                         ..NewCrate::default()
                     }
                     .create_or_update(conn, 1, None)
@@ -384,11 +385,6 @@ pub fn add_dependencies(
                         Crate::by_exact_name(&dep.name).first(conn).map_err(|_| {
                             cargo_err(&format_args!("no known crate named `{}`", &*dep.name))
                         })?;
-                    if let Ok(version_req) = semver::VersionReq::parse(&dep.version_req.0) {
-                        if version_req == semver::VersionReq::STAR {
-                            return Err(cargo_err(WILDCARD_ERROR_MESSAGE));
-                        }
-                    }
                     krate
                 } else {
                     crate_for_foreign_dep()?
@@ -396,6 +392,12 @@ pub fn add_dependencies(
             } else {
                 crate_for_foreign_dep()?
             };
+
+            if let Ok(version_req) = semver::VersionReq::parse(&dep.version_req.0) {
+                if version_req == semver::VersionReq::STAR {
+                    return Err(cargo_err(WILDCARD_ERROR_MESSAGE));
+                }
+            }
 
             // If this dependency has an explicit name in `Cargo.toml` that
             // means that the `name` we have listed is actually the package name
