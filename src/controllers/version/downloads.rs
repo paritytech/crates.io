@@ -33,7 +33,7 @@ pub fn download(req: &mut dyn RequestExt) -> EndpointResult {
         // happen if the pool is not healthy or if an operator manually configured the application to
         // always perform unconditional redirects (for example as part of the mitigations for an
         // outage). See the comments below for a description of what unconditional redirects do.
-        let conn = if app.config.force_unconditional_redirects {
+        let conn = if true {
             None
         } else {
             match req.db_read_prefer_primary() {
@@ -103,20 +103,26 @@ pub fn download(req: &mut dyn RequestExt) -> EndpointResult {
         }
     };
 
-    let redirect_path = req
-        .app()
-        .config
-        .uploader()
-        .crate_location(&crate_name, version);
-
     let conn = req.db_read_prefer_primary()?;
     let redirect_url = match Crate::by_name(&crate_name).first::<Crate>(&*conn) {
-        Ok(_) => redirect_path,
-        Err(_) => {
-            format!("https://crates.io/api/v1{redirect_path}")
+        Ok(krate)
+            if krate
+                .description
+                .as_ref()
+                .map(|description| description != "Foreign crate for self-hosted instance")
+                .unwrap_or(true) =>
+        {
+            req.app()
+                .config
+                .uploader()
+                .crate_location(&crate_name, version)
+        }
+        _ => {
+            format!("https://crates.io/api/v1/crates/{crate_name}/{version}/download")
         }
     };
 
+    println!("Redirecting download of crate to url {redirect_url}");
     if req.wants_json() {
         Ok(req.json(&json!({ "url": redirect_url })))
     } else {
