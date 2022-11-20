@@ -366,8 +366,8 @@ pub fn add_dependencies(
                         krate
                     } else {
                         return Err(cargo_err(&format_args!(
-                            "crate named `{}` is not a foreign dependency",
-                            &*dep.name
+                            "crate named `{}` is not a foreign dependency (had registry {:?})",
+                            &*dep.name, dep.registry
                         )));
                     }
                 } else {

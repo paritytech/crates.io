@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Arc::new(App::new(config, Some(client)));
 
     {
-        if env::var("SKIP_INIT").is_err() {
+        if env::var("CRATESIO_TOKEN").is_err() {
             use cargo_registry::models::NewUser;
             use cargo_registry::schema::{api_tokens, emails, users};
             use diesel::prelude::*;
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ))
                 .execute(&conn).unwrap();
 
-            let api_token_prefix = env::var("API_TOKEN_PREFIX").unwrap();
+            let api_token_prefix = env::var("CRATESIO_TOKEN_PREFIX").unwrap();
             use cargo_registry::models::ApiToken;
             let token = ApiToken::insert(&conn, user.id, "foo").unwrap();
             println!("{}={}", api_token_prefix, token.plaintext);

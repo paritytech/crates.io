@@ -103,23 +103,15 @@ pub fn download(req: &mut dyn RequestExt) -> EndpointResult {
         }
     };
 
-    let conn = req.db_read_prefer_primary()?;
-    let redirect_url = match Crate::by_name(&crate_name).first::<Crate>(&*conn) {
-        Ok(krate)
-            if krate
-                .description
-                .as_ref()
-                .map(|description| description != "Foreign crate for self-hosted instance")
-                .unwrap_or(true) =>
-        {
-            req.app()
-                .config
-                .uploader()
-                .crate_location(&crate_name, version)
-        }
-        _ => {
-            format!("https://crates.io/api/v1/crates/{crate_name}/{version}/download")
-        }
+    let local_crates = std::env::var("CRATESIO_LOCAL_CRATES").unwrap();
+    let mut local_crates = local_crates.split(" ");
+    let redirect_url = if local_crates.any(|local_crate| local_crate == &crate_name) {
+        req.app()
+            .config
+            .uploader()
+            .crate_location(&crate_name, version)
+    } else {
+        format!("https://crates.io/api/v1/crates/{crate_name}/{version}/download")
     };
 
     println!("Redirecting download of crate to url {redirect_url}");
