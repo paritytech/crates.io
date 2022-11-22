@@ -14,6 +14,7 @@ use crate::models::{
     insert_version_owner_action, Category, Crate, DependencyKind, Keyword, NewCrate, NewVersion,
     Rights, VersionAction,
 };
+use crate::views::krate_publish::EncodableCrateName;
 use crate::worker;
 
 use crate::middleware::log_request::add_custom_metadata;
@@ -344,54 +345,54 @@ pub fn add_dependencies(
         .map(|dep| {
             // Match only identical names to ensure the index always references the original crate name
 
-            // Official crates.io implementation doesn't support alternate registries
-            // https://github.com/rust-lang/crates.io/pull/1589
-            let krate = if
-            /* crates.io and foreign registries */
-            dep
-                .registry
-                .as_ref()
-                .map(|reg| !(reg.is_empty() || reg == "local"))
-                .unwrap_or(false)
+            let local_crates = std::env::var("CRATESIO_LOCAL_CRATES").unwrap();
+            let mut local_crates = local_crates.split(" ");
+            let krate = if local_crates
+                .any(|local_crate| EncodableCrateName(local_crate.into()) == *dep.name)
             {
-                let user = users::table.first::<crate::models::User>(conn)?;
-                let foreign_crate_description = "Foreign crate for self-hosted instance";
-                if let Ok(krate) = Crate::by_exact_name(&dep.name).first::<Crate>(conn) {
-                    if krate
-                        .description
-                        .as_ref()
-                        .map(|description| description == foreign_crate_description)
-                        .unwrap_or(false)
-                    {
-                        krate
-                    } else {
-                        return Err(cargo_err(&format_args!(
-                            "crate named `{}` is not a foreign dependency (had registry {:?})",
-                            &*dep.name, dep.registry
-                        )));
-                    }
-                } else {
-                    let krate = NewCrate {
-                        name: &*dep.name,
-                        homepage: Some("https://foo.bar"),
-                        documentation: Some("https://foo.bar"),
-                        repository: Some("https://foo.bar"),
-                        description: Some(foreign_crate_description),
-                        ..NewCrate::default()
-                    }
-                    .create_or_update(conn, user.id, None)
-                    .map_err(|err| {
-                        cargo_err(&format_args!(
-                            "Unable to mock crate `{}`: {:?}",
-                            &*dep.name, err
-                        ))
-                    })?;
-                    krate
-                }
-            } else {
                 Crate::by_exact_name(&dep.name).first(conn).map_err(|_| {
                     cargo_err(&format_args!("no known crate named `{}`", &*dep.name))
                 })?
+            } else {
+                match Crate::by_exact_name(&dep.name).first(conn) {
+                    Ok(krate) => krate,
+                    _ => {
+                        let user = users::table.first::<crate::models::User>(conn)?;
+                        let foreign_crate_description = "Foreign crate for self-hosted instance";
+                        if let Ok(krate) = Crate::by_exact_name(&dep.name).first::<Crate>(conn) {
+                            if krate
+                                .description
+                                .as_ref()
+                                .map(|description| description == foreign_crate_description)
+                                .unwrap_or(false)
+                            {
+                                krate
+                            } else {
+                                return Err(cargo_err(&format_args!(
+                                    "crate named `{}` is not a foreign dependency (had registry {:?})",
+                                    &*dep.name, dep.registry
+                                )));
+                            }
+                        } else {
+                            let krate = NewCrate {
+                                name: &*dep.name,
+                                homepage: Some("https://foo.bar"),
+                                documentation: Some("https://foo.bar"),
+                                repository: Some("https://foo.bar"),
+                                description: Some(foreign_crate_description),
+                                ..NewCrate::default()
+                            }
+                            .create_or_update(conn, user.id, None)
+                            .map_err(|err| {
+                                cargo_err(&format_args!(
+                                    "Unable to mock crate `{}`: {:?}",
+                                    &*dep.name, err
+                                ))
+                            })?;
+                            krate
+                        }
+                    }
+                }
             };
 
             if let Ok(version_req) = semver::VersionReq::parse(&dep.version_req.0) {
