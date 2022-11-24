@@ -154,11 +154,12 @@ pub fn connection_url(config: &config::DatabasePools, url: &str) -> String {
 
     // Configure the time it takes for diesel to return an error when there is full packet loss
     // between the application and the database.
-    maybe_append_url_param(
-        &mut url,
-        "tcp_user_timeout",
-        &config.tcp_timeout_ms.to_string(),
-    );
+    // Hack: CI runs on Postgres 11, which doesn't support this flag
+    // maybe_append_url_param(
+    //     &mut url,
+    //     "tcp_user_timeout",
+    //     &config.tcp_timeout_ms.to_string(),
+    // );
 
     url.into()
 }
