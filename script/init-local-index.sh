@@ -35,9 +35,21 @@ git remote add origin file://"$project_root"/tmp/index-bare
 git push -q origin master -u > /dev/null
 popd
 
-# Remove the temporary checkout
-rm -rf tmp/index-tmp/.git
-rm -rf tmp/index-tmp
+# Remove the temporary checkout.
+# Need to retry multiple times because some lingering process might be locking
+# a file within the .git directory, which would prevent the cleanup.
+for ((i=0; i < 8; i++)); do
+  if rm -rf tmp/index-tmp; then
+    break
+  else
+    fuser -k tmp/index-tmp || :
+    sleep 2
+  fi
+done
+if [ -d tmp/index-tmp ]; then
+  >&2 echo "Failed to clean up tmp/index-tmp"
+  exit 1
+fi
 
 # Allow the index to be exported via HTTP during local development
 touch tmp/index-bare/git-daemon-export-ok
