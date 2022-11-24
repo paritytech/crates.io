@@ -18,12 +18,12 @@ mkdir -p tmp
 rm -rf tmp/index-bare tmp/index-tmp
 
 echo "Initializing repository in tmp/index-bare..."
-git init -q --bare --initial-branch=master tmp/index-bare
+git -c init.defaultBranch=master init  -q --bare tmp/index-bare
 
 echo "Creating temporary clone in tmp/index-tmp..."
 git clone --depth 1 https://github.com/rust-lang/crates.io-index tmp/index-tmp
 rm -rf tmp/index-tmp/.git
-git init -q --initial-branch=master tmp/index-tmp
+git -c init.defaultBranch=master init -q tmp/index-tmp
 pushd tmp/index-tmp
 echo '{
   "dl": "http://localhost:8888/api/v1/crates",
