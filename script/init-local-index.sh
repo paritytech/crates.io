@@ -21,8 +21,9 @@ echo "Initializing repository in tmp/index-bare..."
 git -c init.defaultBranch=master init  -q --bare tmp/index-bare
 
 echo "Creating temporary clone in tmp/index-tmp..."
-git clone --depth 1 https://github.com/rust-lang/crates.io-index tmp/index-tmp
-rm -rf tmp/index-tmp/.git
+curl -sSLf -o index.zip https://github.com/rust-lang/crates.io-index/archive/refs/heads/master.zip
+unzip index.zip
+mv crates.io-index-master tmp/index-tmp
 git -c init.defaultBranch=master init -q tmp/index-tmp
 pushd tmp/index-tmp
 echo '{
@@ -42,7 +43,6 @@ for ((i=0; i < 8; i++)); do
   if rm -rf tmp/index-tmp; then
     break
   else
-    fuser -k tmp/index-tmp || :
     sleep 2
   fi
 done
