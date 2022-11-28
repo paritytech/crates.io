@@ -22,7 +22,7 @@ git -c init.defaultBranch=master init  -q --bare tmp/index-bare
 
 echo "Creating temporary clone in tmp/index-tmp..."
 curl -sSLf -o index.zip https://github.com/rust-lang/crates.io-index/archive/refs/heads/master.zip
-unzip index.zip
+unzip -qq index.zip
 mv crates.io-index-master tmp/index-tmp
 git -c init.defaultBranch=master init -q tmp/index-tmp
 pushd tmp/index-tmp
